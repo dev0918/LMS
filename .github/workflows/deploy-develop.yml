@@ -34,37 +34,40 @@ jobs:
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
-          # Stop old gunicorn process for develop environment
-          sudo pkill -f "gunicorn.*develop" || true
+          echo "Stopping old gunicorn processes..."
+          sudo pkill -9 -f "gunicorn.*port.*8002" || true
+          sleep 1
           # Start gunicorn for develop on port 8002
+          echo "Starting gunicorn on port 8002..."
           sudo bash -c 'cd /home/ec2-user/lms2/LMS && . venv/bin/activate && \
             gunicorn config.wsgi:application \
             --bind 127.0.0.1:8002 \
-            --workers 4 \
-            --timeout 120 \
+            --workers 2 \
+            --timeout 60 \
             --access-logfile /var/log/gunicorn/develop-access.log \
             --error-logfile /var/log/gunicorn/develop-error.log \
-            --daemon'
-          sleep 2
-          echo "Gunicorn started on port 8002 (develop)"
-          sudo systemctl restart nginx
-          sudo systemctl is-active --quiet nginx
-          echo "--- Nginx status ---"
-          sudo systemctl --no-pager --full status nginx | sed -n '1,20p'
-          # Smoke test for develop environment
-          LOCAL_CODE=$(curl -sS -H "Host: 98.92.14.139" http://127.0.0.1:8002/ -o /tmp/lms_develop.html -w "%{http_code}")
-          if [ "$LOCAL_CODE" -ge 400 ]; then
-            echo "Smoke test failed for develop: app returned HTTP $LOCAL_CODE"
-            echo "--- gunicorn develop log (tail) ---"
-            sudo tail -n 120 /var/log/gunicorn/develop-error.log || true
+            --daemon' &
+          sleep 3
+          echo "Reloading nginx..."
+          sudo systemctl reload nginx || sudo systemctl restart nginx
+          sleep 1
+          # Smoke test for develop environment (with timeout)
+          echo "Running smoke test on localhost:8002..."
+          LOCAL_CODE=$(timeout 10 curl -sS -H "Host: 98.92.14.139" http://127.0.0.1:8002/ -o /tmp/lms_develop.html -w "%{http_code}" || echo "000")
+          echo "Local smoke test returned: $LOCAL_CODE"
+          if [ "$LOCAL_CODE" -ge 400 ] || [ "$LOCAL_CODE" = "000" ]; then
+            echo "Smoke test failed: app returned HTTP $LOCAL_CODE"
+            sudo tail -n 50 /var/log/gunicorn/develop-error.log || true
             exit 1
           fi
 
-    - name: Public endpoint smoke test (develop)
+    - name: Public endpoint smoke test (Develop)
       run: |
-        PUBLIC_CODE=$(curl -sS http://98.92.14.139/develop/ -o /tmp/public_develop.html -w "%{http_code}")
-        if [ "$PUBLIC_CODE" -ge 400 ]; then
-          echo "Public smoke test failed for develop: endpoint returned HTTP $PUBLIC_CODE"
+        echo "Running public smoke test on http://98.92.14.139/develop/..."
+        PUBLIC_CODE=$(timeout 10 curl -sS http://98.92.14.139/develop/ -o /tmp/public_develop.html -w "%{http_code}" || echo "000")
+        echo "Public endpoint returned: $PUBLIC_CODE"
+        if [ "$PUBLIC_CODE" -ge 400 ] || [ "$PUBLIC_CODE" = "000" ]; then
+          echo "Public smoke test failed: endpoint returned HTTP $PUBLIC_CODE"
           exit 1
         fi
         echo "✓ Develop deployment successful. Endpoint: http://98.92.14.139/develop/"
