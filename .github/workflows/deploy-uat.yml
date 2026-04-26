@@ -27,8 +27,10 @@ jobs:
           echo "Deployed commit: $(git rev-parse --short HEAD)"
           . venv/bin/activate
           pip install -r requirements.txt
-          # Load UAT environment variables
-          export $(cat .env.uat | grep -v "^#" | xargs)
+          # Load UAT environment variables safely
+          set -a
+          source .env.uat
+          set +a
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput

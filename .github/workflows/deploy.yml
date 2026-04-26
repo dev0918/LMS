@@ -27,8 +27,10 @@ jobs:
           echo "Deployed commit: $(git rev-parse --short HEAD)"
           . venv/bin/activate
           pip install -r requirements.txt
-          # Load production environment variables
-          export $(cat .env.main | grep -v "^#" | xargs)
+          # Load production environment variables safely
+          set -a
+          source .env.main
+          set +a
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
