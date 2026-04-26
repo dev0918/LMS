@@ -40,6 +40,9 @@ _configured_allowed_hosts = list(
 )
 _required_allowed_hosts = ["127.0.0.1", "localhost", "98.92.14.139"]
 ALLOWED_HOSTS = list(dict.fromkeys(_configured_allowed_hosts + _required_allowed_hosts))
+ALLOW_ALL_HOSTS = config("ALLOW_ALL_HOSTS", default=True, cast=bool)
+if ALLOW_ALL_HOSTS:
+    ALLOWED_HOSTS = ["*"]
 
 _configured_csrf_origins = list(
     config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
