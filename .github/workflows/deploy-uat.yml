@@ -94,7 +94,11 @@ jobs:
           echo "Local smoke test returned: $LOCAL_CODE"
           if [ "$LOCAL_CODE" -ge 400 ] || [ "$LOCAL_CODE" = "000" ]; then
             echo "Smoke test failed: app returned HTTP $LOCAL_CODE"
-            tail -n 50 /var/log/gunicorn/uat-error.log || true
+            echo "Response content:"
+            cat /tmp/lms_uat.html || true
+            echo ""
+            echo "=== Gunicorn error log ==="
+            tail -n 100 "$LOG_DIR/uat-error.log" || echo "No error log found"
             exit 1
           fi
           echo "✓ Local smoke test passed"
