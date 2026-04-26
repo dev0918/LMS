@@ -34,20 +34,26 @@ jobs:
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
-          echo "Stopping old gunicorn processes..."
-          sudo pkill -9 -f "gunicorn.*port.*8002" || true
-          sleep 1
-          # Start gunicorn for develop on port 8002
           echo "Starting gunicorn on port 8002..."
-          sudo bash -c 'cd /home/ec2-user/lms2/LMS && . venv/bin/activate && \
-            gunicorn config.wsgi:application \
+          # Kill any existing process on port 8002 (gentle approach)
+          fuser -k 8002/tcp 2>/dev/null || true
+          sleep 1
+          # Start gunicorn for develop with daemon mode
+          cd /home/ec2-user/lms2/LMS
+          . venv/bin/activate
+          gunicorn config.wsgi:application \
             --bind 127.0.0.1:8002 \
             --workers 2 \
             --timeout 60 \
             --access-logfile /var/log/gunicorn/develop-access.log \
             --error-logfile /var/log/gunicorn/develop-error.log \
-            --daemon' &
-          sleep 3
+            --daemon
+          GSTATUS=$?
+          sleep 2
+          if [ $GSTATUS -ne 0 ]; then
+            echo "Failed to start gunicorn"
+            exit 1
+          fi
           echo "Reloading nginx..."
           sudo systemctl reload nginx || sudo systemctl restart nginx
           sleep 1
@@ -57,7 +63,7 @@ jobs:
           echo "Local smoke test returned: $LOCAL_CODE"
           if [ "$LOCAL_CODE" -ge 400 ] || [ "$LOCAL_CODE" = "000" ]; then
             echo "Smoke test failed: app returned HTTP $LOCAL_CODE"
-            sudo tail -n 50 /var/log/gunicorn/develop-error.log || true
+            tail -n 50 /var/log/gunicorn/develop-error.log || true
             exit 1
           fi
 
