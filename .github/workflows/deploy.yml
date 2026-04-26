@@ -28,7 +28,7 @@ jobs:
           . venv/bin/activate
           pip install -r requirements.txt
           # Load production environment variables
-          export $(cat .env.main | xargs)
+          export $(cat .env.main | grep -v "^#" | xargs)
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput

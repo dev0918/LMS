@@ -28,7 +28,7 @@ jobs:
           . venv/bin/activate
           pip install -r requirements.txt
           # Load develop environment variables
-          export $(cat .env.develop | xargs)
+          export $(cat .env.develop | grep -v "^#" | xargs)
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
