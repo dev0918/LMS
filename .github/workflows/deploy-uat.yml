@@ -46,46 +46,40 @@ jobs:
           fuser -k 8001/tcp 2>/dev/null || true
           sleep 1
           
-          # Ensure log directory exists
-          mkdir -p /var/log/gunicorn || true
+          # Create user-writable log directory in app folder
+          LOG_DIR="/home/ec2-user/lms2/LMS/logs"
+          mkdir -p "$LOG_DIR" || true
           
-          # Test gunicorn briefly in foreground to catch startup errors
-          echo "Testing gunicorn startup..."
-          timeout 5 gunicorn config.wsgi:application \
-            --bind 127.0.0.1:8001 \
-            --workers 1 \
-            --timeout 30 2>&1 | head -n 20 || true
-          
-          # Now start gunicorn properly as daemon
+          # Start gunicorn as daemon with user-writable logs
           echo "Starting gunicorn daemon..."
           nohup gunicorn config.wsgi:application \
             --bind 127.0.0.1:8001 \
             --workers 2 \
             --timeout 60 \
-            --access-logfile /var/log/gunicorn/uat-access.log \
-            --error-logfile /var/log/gunicorn/uat-error.log \
+            --access-logfile "$LOG_DIR/uat-access.log" \
+            --error-logfile "$LOG_DIR/uat-error.log" \
             --daemon \
-            --pid /tmp/gunicorn-uat.pid > /tmp/gunicorn-uat.startup.log 2>&1 &
+            --pid /tmp/gunicorn-uat.pid > "$LOG_DIR/uat-startup.log" 2>&1 &
           
           # Wait for daemon startup
           sleep 4
           
           # Verify gunicorn process is running
           echo "Checking gunicorn process..."
-          if ! ps aux | grep gunicorn | grep -v grep; then
+          if ! ps aux | grep '[g]unicorn' > /dev/null 2>&1; then
             echo "ERROR: Gunicorn process not found!"
             echo "=== Gunicorn startup log ==="
-            cat /tmp/gunicorn-uat.startup.log || true
+            cat "$LOG_DIR/uat-startup.log" || echo "No startup log"
             echo "=== Gunicorn error log ==="
-            tail -n 50 /var/log/gunicorn/uat-error.log || echo "No error log found"
+            tail -n 50 "$LOG_DIR/uat-error.log" || echo "No error log found"
             exit 1
           fi
           
           # Verify port 8001 is listening
           echo "Checking if port 8001 is listening..."
-          if ! ss -tlnp | grep 8001; then
+          if ! ss -tlnp 2>/dev/null | grep 8001 || ! netstat -tlnp 2>/dev/null | grep 8001; then
             echo "ERROR: Port 8001 not listening!"
-            tail -n 50 /var/log/gunicorn/uat-error.log || true
+            tail -n 50 "$LOG_DIR/uat-error.log" || true
             exit 1
           fi
           echo "✓ Gunicorn started successfully"
