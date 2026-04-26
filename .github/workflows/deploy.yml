@@ -49,14 +49,24 @@ jobs:
             --error-logfile /var/log/gunicorn/error.log \
             --daemon
           GSTATUS=$?
-          sleep 2
           if [ $GSTATUS -ne 0 ]; then
             echo "Failed to start gunicorn"
             exit 1
           fi
+          # Wait for gunicorn to be ready
+          sleep 3
+          # Verify gunicorn process is running
+          echo "Checking gunicorn process..."
+          ps aux | grep gunicorn | grep -v grep || { echo "Gunicorn process not found!"; exit 1; }
+          # Verify port 8000 is listening
+          echo "Checking if port 8000 is listening..."
+          ss -tlnp | grep 8000 || { echo "Port 8000 not listening!"; tail -n 50 /var/log/gunicorn/error.log; exit 1; }
+          echo "✓ Gunicorn started successfully"
+          
           echo "Reloading nginx..."
           sudo systemctl reload nginx || sudo systemctl restart nginx
-          sleep 1
+          sleep 2
+          
           # Smoke test for production environment (with timeout)
           echo "Running smoke test on localhost:8000..."
           LOCAL_CODE=$(timeout 10 curl -sS -H "Host: 98.92.14.139" http://127.0.0.1:8000/ -o /tmp/lms_home.html -w "%{http_code}" || echo "000")
@@ -66,6 +76,7 @@ jobs:
             tail -n 50 /var/log/gunicorn/error.log || true
             exit 1
           fi
+          echo "✓ Local smoke test passed"
 
     - name: Public endpoint smoke test (Production)
       run: |
