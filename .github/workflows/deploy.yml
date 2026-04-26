@@ -1,4 +1,4 @@
-name: Deploy to EC2 Next
+name: Deploy to EC2 Production
 
 on:
   push:
@@ -27,31 +27,46 @@ jobs:
           echo "Deployed commit: $(git rev-parse --short HEAD)"
           . venv/bin/activate
           pip install -r requirements.txt
+          # Load production environment variables
+          export $(cat .env.main | xargs)
           python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
+          # Stop old gunicorn process for production (no suffix needed)
+          sudo pkill -f "gunicorn.*config.wsgi" | grep -v uat | grep -v develop || true
+          # Start gunicorn for production on port 8000
+          sudo bash -c 'cd /home/ec2-user/lms2/LMS && . venv/bin/activate && \
+            gunicorn config.wsgi:application \
+            --bind 127.0.0.1:8000 \
+            --workers 4 \
+            --timeout 120 \
+            --access-logfile /var/log/gunicorn/access.log \
+            --error-logfile /var/log/gunicorn/error.log \
+            --daemon'
+          sleep 2
+          echo "Gunicorn started on port 8000 (Production)"
           sudo systemctl daemon-reload
-          sudo systemctl restart gunicorn
           sudo systemctl restart nginx
-          sudo systemctl is-active --quiet gunicorn
           sudo systemctl is-active --quiet nginx
-          sudo systemctl --no-pager --full status gunicorn | sed -n '1,20p'
+          echo "--- Nginx status ---"
           sudo systemctl --no-pager --full status nginx | sed -n '1,20p'
-          LOCAL_CODE=$(curl -sS -H "Host: 98.92.14.139" http://127.0.0.1/ -o /tmp/lms_home.html -w "%{http_code}")
+          # Smoke test for production environment
+          LOCAL_CODE=$(curl -sS -H "Host: 98.92.14.139" http://127.0.0.1:8000/ -o /tmp/lms_home.html -w "%{http_code}")
           if [ "$LOCAL_CODE" -ge 400 ]; then
             echo "Smoke test failed: app returned HTTP $LOCAL_CODE"
-            echo "--- gunicorn journal (tail) ---"
-            sudo journalctl -u gunicorn -n 120 --no-pager || true
+            echo "--- gunicorn production log (tail) ---"
+            sudo tail -n 120 /var/log/gunicorn/error.log || true
             echo "--- nginx error log (tail) ---"
             sudo tail -n 120 /var/log/nginx/error.log || true
             exit 1
           fi
 
-    - name: Public endpoint smoke test
+    - name: Public endpoint smoke test (Production)
       run: |
         PUBLIC_CODE=$(curl -sS http://98.92.14.139/ -o /tmp/public_home.html -w "%{http_code}")
         if [ "$PUBLIC_CODE" -ge 400 ]; then
           echo "Public smoke test failed: endpoint returned HTTP $PUBLIC_CODE"
           exit 1
         fi
+        echo "✓ Production deployment successful. Endpoint: http://98.92.14.139/"
 

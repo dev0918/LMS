@@ -202,17 +202,24 @@ USE_L10N = True
 USE_TZ = True
 
 
+# Environment-specific configuration
+ENVIRONMENT = config("ENVIRONMENT", default="main")  # main, uat, develop
+ENVIRONMENT_NAME = config("ENVIRONMENT_NAME", default="Production")
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#static-url
-STATIC_URL = "/static/"
+# Support environment-specific static URLs: /develop/static/, /uat/static/, /static/
+_env_prefix = f"/{ENVIRONMENT}" if ENVIRONMENT != "main" else ""
+STATIC_URL = config("STATIC_URL", default=f"{_env_prefix}/static/")
 # https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#std:setting-STATICFILES_DIRS
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#static-root
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+_static_root_suffix = f"-{ENVIRONMENT}" if ENVIRONMENT != "main" else ""
+STATIC_ROOT = os.path.join(BASE_DIR, f"staticfiles{_static_root_suffix}")
 # https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#staticfiles-finders
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -220,8 +227,9 @@ STATICFILES_FINDERS = [
 ]
 
 # Media files config
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+# Support environment-specific media URLs: /develop/media/, /uat/media/, /media/
+MEDIA_URL = config("MEDIA_URL", default=f"{_env_prefix}/media/")
+MEDIA_ROOT = os.path.join(BASE_DIR, f"media")
 
 # -----------------------------------
 # E-mail configuration

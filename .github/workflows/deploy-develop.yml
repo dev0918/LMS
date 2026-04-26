@@ -1,0 +1,68 @@
+name: Deploy to EC2 Develop
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Execute deployment script via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script_stop: true
+        request_pty: true
+        script: |
+          set -euo pipefail
+          cd /home/ec2-user/lms2/LMS
+          git remote set-url origin https://github.com/dev0918/LMS.git
+          git fetch origin develop
+          git reset --hard origin/develop
+          echo "Deployed commit: $(git rev-parse --short HEAD)"
+          . venv/bin/activate
+          pip install -r requirements.txt
+          # Load develop environment variables
+          export $(cat .env.develop | xargs)
+          python manage.py check
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
+          # Stop old gunicorn process for develop environment
+          sudo pkill -f "gunicorn.*develop" || true
+          # Start gunicorn for develop on port 8002
+          sudo bash -c 'cd /home/ec2-user/lms2/LMS && . venv/bin/activate && \
+            gunicorn config.wsgi:application \
+            --bind 127.0.0.1:8002 \
+            --workers 4 \
+            --timeout 120 \
+            --access-logfile /var/log/gunicorn/develop-access.log \
+            --error-logfile /var/log/gunicorn/develop-error.log \
+            --daemon'
+          sleep 2
+          echo "Gunicorn started on port 8002 (develop)"
+          sudo systemctl restart nginx
+          sudo systemctl is-active --quiet nginx
+          echo "--- Nginx status ---"
+          sudo systemctl --no-pager --full status nginx | sed -n '1,20p'
+          # Smoke test for develop environment
+          LOCAL_CODE=$(curl -sS -H "Host: 98.92.14.139" http://127.0.0.1:8002/ -o /tmp/lms_develop.html -w "%{http_code}")
+          if [ "$LOCAL_CODE" -ge 400 ]; then
+            echo "Smoke test failed for develop: app returned HTTP $LOCAL_CODE"
+            echo "--- gunicorn develop log (tail) ---"
+            sudo tail -n 120 /var/log/gunicorn/develop-error.log || true
+            exit 1
+          fi
+
+    - name: Public endpoint smoke test (develop)
+      run: |
+        PUBLIC_CODE=$(curl -sS http://98.92.14.139/develop/ -o /tmp/public_develop.html -w "%{http_code}")
+        if [ "$PUBLIC_CODE" -ge 400 ]; then
+          echo "Public smoke test failed for develop: endpoint returned HTTP $PUBLIC_CODE"
+          exit 1
+        fi
+        echo "✓ Develop deployment successful. Endpoint: http://98.92.14.139/develop/"

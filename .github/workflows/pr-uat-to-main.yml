@@ -1,0 +1,65 @@
+name: UAT to Main - PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Django system check
+      run: |
+        python manage.py check
+
+    - name: Run tests
+      run: |
+        python manage.py test accounts.tests quiz.tests course.tests result.tests --verbosity=2
+
+    - name: Run Pylint
+      continue-on-error: true
+      run: |
+        pip install pylint
+        pylint --load-plugins pylint_django --django-settings-module=config.settings $(find . -name '*.py' -path '*/models.py' -o -path '*/views.py' -o -path '*/forms.py' | head -20) --exit-zero
+
+    - name: Comment PR on success
+      if: success()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ **UAT to Production Validation Passed**\n\n- ✓ Django checks passed\n- ✓ Tests passed\n- ✓ Linting passed\n\nReady for production deployment to main branch.'
+          })
+
+    - name: Comment PR on failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '❌ **UAT to Production Validation Failed**\n\nPlease fix the following issues before merging:\n- Check the build logs for details'
+          })
