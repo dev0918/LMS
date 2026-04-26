@@ -35,7 +35,17 @@ DEBUG = str(config("DEBUG", default=True)).lower() not in (
     "production",
 )
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=Csv())
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="127.0.0.1,localhost,98.92.14.139",
+    cast=Csv(),
+)
+
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="http://127.0.0.1,http://localhost,http://98.92.14.139,https://98.92.14.139",
+    cast=Csv(),
+)
 
 # change the default user models to our custom model
 AUTH_USER_MODEL = "accounts.User"
