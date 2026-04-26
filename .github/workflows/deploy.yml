@@ -25,6 +25,16 @@ jobs:
           git reset --hard origin/main
           echo "Deployed commit: $(git rev-parse --short HEAD)"
           . venv/bin/activate
+          python - <<'PY'
+          import os
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+          import django
+          django.setup()
+          from django.conf import settings
+          print('ALLOW_ALL_HOSTS=', getattr(settings, 'ALLOW_ALL_HOSTS', None))
+          print('ALLOWED_HOSTS=', settings.ALLOWED_HOSTS)
+          print('CSRF_TRUSTED_ORIGINS=', getattr(settings, 'CSRF_TRUSTED_ORIGINS', []))
+          PY
           pip install -r requirements.txt
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
@@ -33,4 +43,17 @@ jobs:
           sudo systemctl restart nginx
           sudo systemctl --no-pager --full status gunicorn | head -n 20
           sudo systemctl --no-pager --full status nginx | head -n 20
+          LOCAL_CODE=$(curl -sS -H "Host: 98.92.14.139" http://127.0.0.1/ -o /tmp/lms_home.html -w "%{http_code}")
+          if [ "$LOCAL_CODE" -ge 400 ]; then
+            echo "Smoke test failed: app returned HTTP $LOCAL_CODE"
+            exit 1
+          fi
+
+    - name: Public endpoint smoke test
+      run: |
+        PUBLIC_CODE=$(curl -sS http://98.92.14.139/ -o /tmp/public_home.html -w "%{http_code}")
+        if [ "$PUBLIC_CODE" -ge 400 ]; then
+          echo "Public smoke test failed: endpoint returned HTTP $PUBLIC_CODE"
+          exit 1
+        fi
 
