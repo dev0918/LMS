@@ -35,12 +35,22 @@ DEBUG = str(config("DEBUG", default=True)).lower() not in (
     "production",
 )
 
+
+def _env_bool(name, default=False):
+    raw = config(name, default=None)
+    if raw is None:
+        return default
+    value = str(raw).strip().lower()
+    if value == "":
+        return default
+    return value in ("1", "true", "yes", "on")
+
 _configured_allowed_hosts = list(
     config("ALLOWED_HOSTS", default="", cast=Csv())
 )
 _required_allowed_hosts = ["127.0.0.1", "localhost", "98.92.14.139"]
 ALLOWED_HOSTS = list(dict.fromkeys(_configured_allowed_hosts + _required_allowed_hosts))
-ALLOW_ALL_HOSTS = config("ALLOW_ALL_HOSTS", default=True, cast=bool)
+ALLOW_ALL_HOSTS = _env_bool("ALLOW_ALL_HOSTS", default=True)
 if ALLOW_ALL_HOSTS:
     ALLOWED_HOSTS = ["*"]
 

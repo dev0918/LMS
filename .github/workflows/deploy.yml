@@ -19,7 +19,7 @@ jobs:
         script_stop: true
         request_pty: true
         script: |
-          set -e
+          set -euo pipefail
           cd /home/ec2-user/lms2/LMS
           git remote set-url origin https://github.com/dev0918/LMS.git
           git fetch origin main
@@ -33,11 +33,17 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart gunicorn
           sudo systemctl restart nginx
-          sudo systemctl --no-pager --full status gunicorn | head -n 20
-          sudo systemctl --no-pager --full status nginx | head -n 20
+          sudo systemctl is-active --quiet gunicorn
+          sudo systemctl is-active --quiet nginx
+          sudo systemctl --no-pager --full status gunicorn | sed -n '1,20p'
+          sudo systemctl --no-pager --full status nginx | sed -n '1,20p'
           LOCAL_CODE=$(curl -sS -H "Host: 98.92.14.139" http://127.0.0.1/ -o /tmp/lms_home.html -w "%{http_code}")
           if [ "$LOCAL_CODE" -ge 400 ]; then
             echo "Smoke test failed: app returned HTTP $LOCAL_CODE"
+            echo "--- gunicorn journal (tail) ---"
+            sudo journalctl -u gunicorn -n 120 --no-pager || true
+            echo "--- nginx error log (tail) ---"
+            sudo tail -n 120 /var/log/nginx/error.log || true
             exit 1
           fi
 
