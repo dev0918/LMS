@@ -1,75 +1,94 @@
 {% extends 'registration/registration_base.html' %}
 {% load i18n %}
 {% block title %}{% trans 'Zyneriq - Login' %}{% endblock title %}
-{% load crispy_forms_tags %}
-{% block content %}
 
-<div class="col-md-4 mx-auto mt-5">
-  <div class="card">
-    <div class="form-title">
-      <i class="fas fa-lock me-2"></i>
-      {% trans 'Sign in' %}
-    </div>
-    <div class="card-body">
-        {% include 'snippets/messages.html' %}
-        <form action="" method="POST" id="login-form">{% csrf_token %}
-          <div class="form-group mb-3">
-              <label class="mb-2" for="username_id"><i class="fas fa-address-card me-2"></i>{% trans 'ID Number' %}</label>
-              <input type="text" name="username" id="username_id" class="form-control" required>
-              <div id="message-wrapper"></div>
-          </div>
-          <div class="form-group mb-3">
-              <label class="mb-2" for="password_id"><i class="fas fa-key me-2"></i>{% trans 'Password' %}</label>
-              <input type="password" name="password" id="password_id" class="form-control" required>
-          </div>
-          {% if form.non_field_errors %}
-                <span class="text-danger"><i class="fas fa-exclamation-circle"></i> {{ form.non_field_errors|striptags }}</span><br>
-          {% elif form.errors %}
-                <span class="text-danger"><i class="fas fa-exclamation-circle"></i> {% trans 'Invalid ID or password.' %}</span><br>
-          {% endif %}
-      
-          <button type="submit" class="btn btn-primary" id="login-btn"><i class="fas fa-sign-in-alt"></i><small>{% trans 'SIGN IN' %}</small></button>
-        </form>
-        <br>
-        <div class="login-bottom">
-          <a href="{% url 'password_reset' %}" class="link">{% trans 'Forgot password ?' %}</a>
-          <br>
-          <a href="{% url 'register' %}" class="btn btn-outline-primary btn-sm mt-3">{% trans 'Create student account' %}</a>
-        </div>
+{% block content %}
+<div class="w-100" style="max-width: 450px;">
+  <div class="glass-card shadow-lg">
+    <div class="text-center mb-4">
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3 shadow-sm" style="width: 65px; height: 65px; font-size: 26px;">
+        <i class="fas fa-user-lock"></i>
       </div>
+      <h2 class="auth-title mb-1">{% trans 'Welcome Back' %}</h2>
+      <p class="text-muted small">{% trans 'Sign in to continue to your dashboard.' %}</p>
+    </div>
+    
+    {% include 'snippets/messages.html' %}
+    
+    <form action="" method="POST" id="login-form" class="mt-4">{% csrf_token %}
+      <div class="form-group mb-4 position-relative">
+          <label class="form-label text-muted small fw-semibold text-uppercase" for="username_id">{% trans 'ID Number' %}</label>
+          <div class="input-group input-group-lg shadow-sm rounded">
+            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-address-card"></i></span>
+            <input type="text" name="username" id="username_id" class="form-control border-start-0 ps-0 form-control-lg" placeholder="Enter your ID" required>
+          </div>
+          <div id="message-wrapper"></div>
+      </div>
+      
+      <div class="form-group mb-4">
+          <label class="form-label text-muted small fw-semibold text-uppercase" for="password_id">{% trans 'Password' %}</label>
+          <div class="input-group input-group-lg shadow-sm rounded">
+            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-key"></i></span>
+            <input type="password" name="password" id="password_id" class="form-control border-start-0 ps-0 form-control-lg" placeholder="Enter your password" required>
+          </div>
+      </div>
+      
+      {% if form.non_field_errors %}
+            <div class="alert alert-danger px-3 py-2 small mb-4 rounded shadow-sm border-0"><i class="fas fa-exclamation-circle me-1"></i> {{ form.non_field_errors|striptags }}</div>
+      {% elif form.errors %}
+            <div class="alert alert-danger px-3 py-2 small mb-4 rounded shadow-sm border-0"><i class="fas fa-exclamation-circle me-1"></i> {% trans 'Invalid ID or password.' %}</div>
+      {% endif %}
+  
+      <div class="d-grid mt-4 pt-2">
+        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow" id="login-btn">
+          {% trans 'SIGN IN' %} <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+      </div>
+    </form>
+    
+    <div class="text-center mt-5 pt-3 border-top border-light">
+      <a href="{% url 'password_reset' %}" class="text-decoration-none text-muted small hover-primary d-block mb-3 transition-opacity">{% trans 'Forgot password?' %}</a>
+      <p class="text-muted small">Don't have an account? <a href="{% url 'register' %}" class="fw-bold text-primary text-decoration-none ms-1">{% trans 'Create student account' %}</a></p>
+    </div>
   </div>
 </div>
 {% endblock content %}
 
 {% block js %}
-
 <script>
   $('#login-form').submit(function (e) {
-    // e.preventDefault();
-    $('#login-btn').addClass('disabled')
-    $('#login-btn').html(`<i class="fas fa-sign-in-alt"></i> Signing you in . . .`)
-  })
+    let btn = $('#login-btn');
+    btn.addClass('disabled');
+    btn.html(`<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Signing you in...`);
+  });
 
-  $("#username").on("input", function () {
-    username = $(this).val();
-
+  $("#username_id").on("input", function () {
+    let username = $(this).val();
+    if(username.length < 2) return;
     $.ajax({
       url: "/accounts/ajax/validate-username/",
-      data: {
-        username: username
-      },
+      data: { username: username },
       dataType: 'json',
       success: function (data) {
         if (data.is_taken) {
-          console.log(data.is_taken);
-          $('#message-wrapper').html(`<p class="my-2 text-danger"><span class="bg-error p-2"><b>${username}</b> already taken :( try another one </span></p>`)
-        }
-        else {
-          $('#message-wrapper').html(`<p class="my-2 text-success"><span class="bg-correct p-2"><b>${username}</b> is valid </span></p>`)
+          $('#message-wrapper').html(`<div class="text-danger small mt-1 fw-medium"><i class="fas fa-times-circle me-1"></i><b>${username}</b> is already taken</div>`);
+        } else {
+          $('#message-wrapper').html(`<div class="text-success small mt-1 fw-medium"><i class="fas fa-check-circle me-1"></i><b>${username}</b> is valid</div>`);
         }
       }
-
-    })
-  })
+    });
+  });
 </script>
+<style>
+.hover-primary { transition: color 0.2s ease; }
+.hover-primary:hover { color: var(--bs-primary) !important; }
+.input-group { border: 1px solid #ced4da; transition: all 0.2s ease; }
+.input-group:focus-within {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+.form-control:focus { border-color: transparent; box-shadow: none; }
+.input-group .form-control { background-color: transparent; }
+.input-group .input-group-text { background-color: transparent; }
+</style>
 {% endblock %}
