@@ -21,21 +21,13 @@ jobs:
         script: |
           set -e
           cd /home/ec2-user/lms2/LMS
+          git remote set-url origin https://github.com/dev0918/LMS.git
           git fetch origin main
           git reset --hard origin/main
           echo "Deployed commit: $(git rev-parse --short HEAD)"
           . venv/bin/activate
-          python - <<'PY'
-          import os
-          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-          import django
-          django.setup()
-          from django.conf import settings
-          print('ALLOW_ALL_HOSTS=', getattr(settings, 'ALLOW_ALL_HOSTS', None))
-          print('ALLOWED_HOSTS=', settings.ALLOWED_HOSTS)
-          print('CSRF_TRUSTED_ORIGINS=', getattr(settings, 'CSRF_TRUSTED_ORIGINS', []))
-          PY
           pip install -r requirements.txt
+          python manage.py check
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
           sudo systemctl daemon-reload
