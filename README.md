@@ -4,7 +4,7 @@ Zyneriq is a Django-based learning management system for managing students,
 lecturers, programs, courses, sessions, semesters, quizzes, assessments, and
 results.
 
-## Features-
+## Features--
 
 - Admin dashboard for school analytics
 - Student, lecturer, session, semester, program, and course management
