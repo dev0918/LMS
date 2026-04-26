@@ -179,4 +179,4 @@ Submit a pull request
 
 This project incorporates open-source components and third-party assets under their respective licenses.
 
-Zyneriq-specific customizations, branding, and deployment configurations are proprietary and owned by Zyneriq.
+Zyneriq-specific customizations, branding and deployment configurations are proprietary and owned by Zyneriq.
