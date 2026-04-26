@@ -20,6 +20,20 @@
 
     <link rel="stylesheet" type="text/css" href="{% static 'css/style.min.css' %}">
 
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bs-body-font-family: 'Outfit', sans-serif;
+            --bs-font-sans-serif: 'Outfit', sans-serif;
+        }
+        body, h1, h2, h3, h4, h5, h6, p, a, span, button, input, select, textarea {
+            font-family: 'Outfit', sans-serif !important;
+        }
+    </style>
+
     <!-- <script src="https://js.stripe.com/v3/"></script> -->
     {% block header %}{% endblock %}
 </head>
