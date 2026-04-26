@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
-from decouple import config
+from decouple import Csv, config
 from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -26,9 +26,33 @@ SECRET_KEY = config(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=True, cast=bool)
+DEBUG = str(config("DEBUG", default=True)).lower() not in (
+    "false",
+    "0",
+    "no",
+    "off",
+    "release",
+    "production",
+)
 
-ALLOWED_HOSTS = ["127.0.0.1", "adilmohak1.pythonanywhere.com", "98.92.14.139", "*"]
+_configured_allowed_hosts = list(
+    config("ALLOWED_HOSTS", default="", cast=Csv())
+)
+_required_allowed_hosts = ["127.0.0.1", "localhost", "98.92.14.139"]
+ALLOWED_HOSTS = list(dict.fromkeys(_configured_allowed_hosts + _required_allowed_hosts))
+
+_configured_csrf_origins = list(
+    config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
+)
+_required_csrf_origins = [
+    "http://127.0.0.1",
+    "http://localhost",
+    "http://98.92.14.139",
+    "https://98.92.14.139",
+]
+CSRF_TRUSTED_ORIGINS = list(
+    dict.fromkeys(_configured_csrf_origins + _required_csrf_origins)
+)
 
 # change the default user models to our custom model
 AUTH_USER_MODEL = "accounts.User"
@@ -37,8 +61,8 @@ AUTH_USER_MODEL = "accounts.User"
 
 DJANGO_APPS = [
     "modeltranslation",  # Translation
-    "jet.dashboard",
-    "jet",
+    "config.apps.JetDashboardConfig",
+    "config.apps.JetConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -190,14 +214,16 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # E-mail configuration
 
 EMAIL_BACKEND = config(
-    "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
-EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS")
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_FROM_ADDRESS = config(
+    "EMAIL_FROM_ADDRESS", default="Zyneriq <noreply@example.com>"
+)
 EMAIL_USE_SSL = False
 
 # crispy config
@@ -236,7 +262,10 @@ LOGGING = {
 }
 
 # WhiteNoise configuration
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+if DEBUG:
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+else:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 STUDENT_ID_PREFIX = config("STUDENT_ID_PREFIX", "ugr")
 LECTURER_ID_PREFIX = config("LECTURER_ID_PREFIX", "lec")
