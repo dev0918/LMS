@@ -35,32 +35,59 @@ jobs:
           python manage.py migrate --noinput
           python manage.py collectstatic --noinput
           echo "Starting gunicorn on port 8000..."
-          # Kill any existing process on port 8000 (gentle approach)
-          fuser -k 8000/tcp 2>/dev/null || true
-          sleep 1
-          # Start gunicorn for production with daemon mode
           cd /home/ec2-user/lms2/LMS
           . venv/bin/activate
-          gunicorn config.wsgi:application \
+          
+          # Verify gunicorn is installed
+          echo "Checking if gunicorn is installed..."
+          which gunicorn || { echo "Gunicorn not found!"; pip show gunicorn; exit 1; }
+          
+          # Kill any existing process on port 8000
+          fuser -k 8000/tcp 2>/dev/null || true
+          sleep 1
+          
+          # Ensure log directory exists
+          mkdir -p /var/log/gunicorn || true
+          
+          # Test gunicorn briefly in foreground to catch startup errors
+          echo "Testing gunicorn startup..."
+          timeout 5 gunicorn config.wsgi:application \
+            --bind 127.0.0.1:8000 \
+            --workers 1 \
+            --timeout 30 2>&1 | head -n 20 || true
+          
+          # Now start gunicorn properly as daemon
+          echo "Starting gunicorn daemon..."
+          nohup gunicorn config.wsgi:application \
             --bind 127.0.0.1:8000 \
             --workers 2 \
             --timeout 60 \
             --access-logfile /var/log/gunicorn/access.log \
             --error-logfile /var/log/gunicorn/error.log \
-            --daemon
-          GSTATUS=$?
-          if [ $GSTATUS -ne 0 ]; then
-            echo "Failed to start gunicorn"
-            exit 1
-          fi
-          # Wait for gunicorn to be ready
-          sleep 3
+            --daemon \
+            --pid /tmp/gunicorn.pid > /tmp/gunicorn.startup.log 2>&1 &
+          
+          # Wait for daemon startup
+          sleep 4
+          
           # Verify gunicorn process is running
           echo "Checking gunicorn process..."
-          ps aux | grep gunicorn | grep -v grep || { echo "Gunicorn process not found!"; exit 1; }
+          if ! ps aux | grep gunicorn | grep -v grep; then
+            echo "ERROR: Gunicorn process not found!"
+            echo "=== Gunicorn startup log ==="
+            cat /tmp/gunicorn.startup.log || true
+            echo "=== Gunicorn error log ==="
+            tail -n 50 /var/log/gunicorn/error.log || echo "No error log found"
+            exit 1
+          fi
+          
           # Verify port 8000 is listening
           echo "Checking if port 8000 is listening..."
-          ss -tlnp | grep 8000 || { echo "Port 8000 not listening!"; tail -n 50 /var/log/gunicorn/error.log; exit 1; }
+          if ! ss -tlnp | grep 8000; then
+            echo "ERROR: Port 8000 not listening!"
+            tail -n 50 /var/log/gunicorn/error.log || true
+            exit 1
+          fi
           echo "✓ Gunicorn started successfully"
           
           echo "Reloading nginx..."
