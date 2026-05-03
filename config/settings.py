@@ -241,6 +241,9 @@ LOGOUT_REDIRECT_URL = "/"
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
 STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY", default="")
 
+# Gemini Chatbot config
+GEMINI_API_KEY = config("GEMINI_API_KEY", default="")
+
 # LOGGING
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#logging

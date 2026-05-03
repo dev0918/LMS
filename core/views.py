@@ -1,7 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+import json
+import requests
 
+from course.models import Course, Program
 from accounts.decorators import admin_required, lecturer_required
 from accounts.models import User, Student
 from .forms import SessionForm, SemesterForm, NewsAndEventsForm
@@ -207,3 +213,63 @@ def unset_current_semester():
     if current_semester:
         current_semester.is_current_semester = False
         current_semester.save()
+
+# ########################################################
+# Chatbot API
+# ########################################################
+@login_required
+@csrf_exempt
+def chatbot_api_view(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            user_message = data.get("message", "")
+            
+            if not user_message:
+                return JsonResponse({"error": "Message is required"}, status=400)
+            
+            headers = {
+                "Content-Type": "application/json",
+            }
+            
+            # Query the database for context
+            programs = Program.objects.all()[:5]
+            courses = Course.objects.all()[:10]
+            news = NewsAndEvents.objects.all().order_by("-updated_date")[:5]
+
+            context_str = "Available Programs: " + ", ".join([p.title for p in programs]) + ". "
+            context_str += "Available Courses: " + ", ".join([f"{c.title} ({c.code})" for c in courses]) + ". "
+            context_str += "Recent News: " + ", ".join([n.title for n in news]) + "."
+            
+            prompt = f"System Instruction: You are a helpful, supportive, and friendly assistant for the Zyneriq Learning Management System (LMS). You can answer student queries about the LMS, general policies, and also help with general personal or motivational topics. Use the following context from the database to give specific answers when asked:\nContext: {context_str}\n\nUser: {user_message}\n\nAssistant:"
+            
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+            }
+            
+            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={settings.GEMINI_API_KEY}"
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                bot_reply = result.get("candidates", [])[0].get("content", {}).get("parts", [])[0].get("text", "").strip()
+                return JsonResponse({"reply": bot_reply})
+            else:
+                return JsonResponse({"error": f"API Error: {response.status_code} - {response.text}"}, status=500)
+            
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+            
+    return JsonResponse({"error": "Invalid request method"}, status=400)

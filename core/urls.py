@@ -14,8 +14,8 @@ from .views import (
     semester_update_view,
     semester_delete_view,
     dashboard_view,
+    chatbot_api_view,
 )
-
 
 urlpatterns = [
     # Accounts url
@@ -32,4 +32,7 @@ urlpatterns = [
     path("semester/<int:pk>/edit/", semester_update_view, name="edit_semester"),
     path("semester/<int:pk>/delete/", semester_delete_view, name="delete_semester"),
     path("dashboard/", dashboard_view, name="dashboard"),
+    
+    # Chatbot API
+    path("chatbot/", chatbot_api_view, name="chatbot_api"),
 ]
